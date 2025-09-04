@@ -18,27 +18,31 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-
-const absenceReasonsData = [
-  { name: "Diarrhoea", value: 45, color: "#ef4444" },
-  { name: "Various reasons", value: 35, color: "#3b82f6" },
-  { name: "School fees", value: 8, color: "#eab308" },
-  { name: "Malaria", value: 7, color: "#10b981" },
-  { name: "Typhoid", value: 3, color: "#8b5cf6" },
-  { name: "Flu", value: 2, color: "#f97316" },
-]
-
-const attendanceByDistrictData = [
-  { district: "Kisoro", present: 100, absent: 35 },
-  { district: "Isingiro", present: 120, absent: 60 },
-  { district: "KikorO", present: 5, absent: 3 },
-  { district: "Kaliro", present: 8, absent: 5 },
-  { district: "Ibanda", present: 42, absent: 38 },
-  { district: "Rak", present: 42, absent: 26 },
-]
+import {
+  fetchAttendanceData,
+  fetchUsersData,
+  calculateStats,
+  processAbsenceReasons,
+  processAttendanceByDistrict,
+  type AttendanceRecord,
+  type UserRecord,
+  type DashboardStats,
+} from "@/lib/api"
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([])
+  const [usersData, setUsersData] = useState<UserRecord[]>([])
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPresent: 0,
+    totalAbsent: 0,
+    attendanceRate: 0,
+    totalSchools: 0,
+    totalDistricts: 0,
+    totalTeachers: 0,
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if user is logged in
@@ -51,12 +55,43 @@ export default function DashboardPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (user) {
+      fetchData()
+
+      // Set up auto-refresh every 5 minutes
+      const intervalId = setInterval(fetchData, 5 * 60 * 1000)
+      return () => clearInterval(intervalId)
+    }
+  }, [user])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const [attendance, users] = await Promise.all([fetchAttendanceData(), fetchUsersData()])
+
+      setAttendanceData(attendance)
+      setUsersData(users)
+      setStats(calculateStats(attendance, users))
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err)
+      setError("Failed to load data. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!user) {
     return <div>Loading...</div>
   }
 
+  const absenceReasonsData = processAbsenceReasons(attendanceData)
+  const attendanceByDistrictData = processAttendanceByDistrict(attendanceData, usersData)
+
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
       {/* Sidebar */}
       <DashboardSidebar user={user} />
 
@@ -66,29 +101,43 @@ export default function DashboardPage() {
         <DashboardHeader user={user} />
 
         {/* Dashboard Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
           <div className="space-y-6">
             {/* Breadcrumb */}
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-2 text-sm text-emerald-600">
               <span>🏠</span>
               <span>/</span>
-              <span>Dashboard</span>
+              <span className="font-medium">Dashboard</span>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold text-emerald-800">Dashboard</h1>
+              {loading && (
+                <div className="flex items-center space-x-2 text-sm text-emerald-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                  <span>Refreshing data...</span>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
 
             {/* Statistics Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Total Present Card */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-emerald-100 hover:shadow-xl transition-all duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Total Present</p>
-                      <p className="text-3xl font-bold text-gray-900">317</p>
-                      <p className="text-sm text-gray-500">students attended</p>
+                      <p className="text-sm text-emerald-600 mb-1 font-medium">Total Present</p>
+                      <p className="text-3xl font-bold text-emerald-800">{stats.totalPresent}</p>
+                      <p className="text-sm text-emerald-500">students attended</p>
                     </div>
-                    <div className="w-12 h-12 bg-gray-800 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl flex items-center justify-center shadow-lg">
                       <Users className="w-6 h-6 text-white" />
                     </div>
                   </div>
@@ -96,15 +145,15 @@ export default function DashboardPage() {
               </Card>
 
               {/* Total Absent Card */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-blue-100 hover:shadow-xl transition-all duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Total Absent</p>
-                      <p className="text-3xl font-bold text-gray-900">167</p>
-                      <p className="text-sm text-gray-500">students absent</p>
+                      <p className="text-sm text-blue-600 mb-1 font-medium">Total Absent</p>
+                      <p className="text-3xl font-bold text-blue-800">{stats.totalAbsent}</p>
+                      <p className="text-sm text-blue-500">students absent</p>
                     </div>
-                    <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
                       <UserX className="w-6 h-6 text-white" />
                     </div>
                   </div>
@@ -112,15 +161,15 @@ export default function DashboardPage() {
               </Card>
 
               {/* Attendance Rate Card */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-green-100 hover:shadow-xl transition-all duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Attendance Rate</p>
-                      <p className="text-3xl font-bold text-gray-900">65.5%</p>
-                      <p className="text-sm text-gray-500">overall attendance</p>
+                      <p className="text-sm text-green-600 mb-1 font-medium">Attendance Rate</p>
+                      <p className="text-3xl font-bold text-green-800">{stats.attendanceRate}%</p>
+                      <p className="text-sm text-green-500">overall attendance</p>
                     </div>
-                    <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
                       <TrendingUp className="w-6 h-6 text-white" />
                     </div>
                   </div>
@@ -128,15 +177,15 @@ export default function DashboardPage() {
               </Card>
 
               {/* Schools Card */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-pink-100 hover:shadow-xl transition-all duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Schools</p>
-                      <p className="text-3xl font-bold text-gray-900">33</p>
-                      <p className="text-sm text-gray-500">across 7 districts</p>
+                      <p className="text-sm text-pink-600 mb-1 font-medium">Schools</p>
+                      <p className="text-3xl font-bold text-pink-800">{stats.totalSchools}</p>
+                      <p className="text-sm text-pink-500">across {stats.totalDistricts} districts</p>
                     </div>
-                    <div className="w-12 h-12 bg-pink-500 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
                       <School className="w-6 h-6 text-white" />
                     </div>
                   </div>
@@ -147,9 +196,9 @@ export default function DashboardPage() {
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Absence Reasons Pie Chart */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-emerald-100">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Absence Reasons</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-emerald-800">Absence Reasons</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -164,9 +213,10 @@ export default function DashboardPage() {
                           label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           labelLine={false}
                         >
-                          {absenceReasonsData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
+                          {absenceReasonsData.map((entry, index) => {
+                            const colors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#8b5cf6", "#f97316"]
+                            return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                          })}
                         </Pie>
                         <Tooltip />
                       </PieChart>
@@ -174,20 +224,26 @@ export default function DashboardPage() {
                   </div>
                   {/* Legend */}
                   <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                    {absenceReasonsData.map((item, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-gray-600">{item.name}</span>
-                      </div>
-                    ))}
+                    {absenceReasonsData.map((item, index) => {
+                      const colors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#8b5cf6", "#f97316"]
+                      return (
+                        <div key={index} className="flex items-center space-x-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: colors[index % colors.length] }}
+                          ></div>
+                          <span className="text-emerald-600">{item.name}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Attendance by District Bar Chart */}
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-white/80 backdrop-blur-sm shadow-lg border-emerald-100">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Attendance by District</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-emerald-800">Attendance by District</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
