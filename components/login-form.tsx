@@ -40,7 +40,8 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hygienequestemdpoints.onrender.com"
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "https://hygienequestemdpoints.onrender.com"
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,23 +54,33 @@ export function LoginForm() {
         ? `${API_BASE_URL}/dashboard/send-login-otp`
         : `${API_BASE_URL}/dashboard/send-registration-otp`
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ phone }),
+        signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to send OTP")
+        const errorData = await response.json().catch(() => ({ detail: "Network error occurred" }))
+        throw new Error(errorData.detail || `Server error: ${response.status}`)
       }
 
       setStep("otp")
       setSuccess("OTP sent to your phone number")
     } catch (err: any) {
-      setError(err.message || "Failed to send OTP")
+      if (err.name === "AbortError") {
+        setError("Request timed out. Please check your connection and try again.")
+      } else {
+        setError(err.message || "Failed to send OTP. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -82,6 +93,9 @@ export function LoginForm() {
     setSuccess("")
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
       if (isLogin) {
         // Login with OTP
         const response = await fetch(`${API_BASE_URL}/dashboard/login`, {
@@ -90,11 +104,14 @@ export function LoginForm() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ phone, otp }),
+          signal: controller.signal,
         })
 
+        clearTimeout(timeoutId)
+
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.detail || "Login failed")
+          const errorData = await response.json().catch(() => ({ detail: "Login failed" }))
+          throw new Error(errorData.detail || `Login failed: ${response.status}`)
         }
 
         const userData: LoginResponse = await response.json()
@@ -112,11 +129,13 @@ export function LoginForm() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ phone, otp }),
+          signal: controller.signal,
         })
 
         if (!verifyResponse.ok) {
-          const errorData = await verifyResponse.json()
-          throw new Error(errorData.detail || "OTP verification failed")
+          clearTimeout(timeoutId)
+          const errorData = await verifyResponse.json().catch(() => ({ detail: "OTP verification failed" }))
+          throw new Error(errorData.detail || `OTP verification failed: ${verifyResponse.status}`)
         }
 
         // Then register the user
@@ -126,11 +145,14 @@ export function LoginForm() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ phone, name, role }),
+          signal: controller.signal,
         })
 
+        clearTimeout(timeoutId)
+
         if (!registerResponse.ok) {
-          const errorData = await registerResponse.json()
-          throw new Error(errorData.detail || "Registration failed")
+          const errorData = await registerResponse.json().catch(() => ({ detail: "Registration failed" }))
+          throw new Error(errorData.detail || `Registration failed: ${registerResponse.status}`)
         }
 
         // Registration successful - show success message and redirect to login
@@ -143,7 +165,11 @@ export function LoginForm() {
         }, 2000)
       }
     } catch (err: any) {
-      setError(err.message || "Operation failed")
+      if (err.name === "AbortError") {
+        setError("Request timed out. Please check your connection and try again.")
+      } else {
+        setError(err.message || "Operation failed. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }
