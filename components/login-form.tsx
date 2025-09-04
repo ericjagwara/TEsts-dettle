@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles } from "lucide-react"
 import Image from "next/image"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface User {
   id: number
@@ -38,6 +39,7 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [hasConsented, setHasConsented] = useState(false)
   const router = useRouter()
 
   const API_BASE_URL =
@@ -45,6 +47,12 @@ export function LoginForm() {
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!isLogin && !hasConsented) {
+      setError("Please accept the privacy policy and terms of service to continue.")
+      return
+    }
+
     setIsLoading(true)
     setError("")
     setSuccess("")
@@ -183,6 +191,7 @@ export function LoginForm() {
     setRole("fieldworker")
     setError("")
     setSuccess("")
+    setHasConsented(false)
   }
 
   return (
@@ -193,7 +202,7 @@ export function LoginForm() {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-full blur-2xl animate-pulse"></div>
             <Image
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/hygiene%20quest.jpg-XAATnFIu9nNxBqv6W3KrOc7rRdeBWL.jpeg"
+              src="/hygiene-quest-logo.png"
               alt="Hygiene Quest Logo"
               width={120}
               height={120}
@@ -290,8 +299,49 @@ export function LoginForm() {
                           <option value="superadmin">Super Admin</option>
                         </select>
                       </div>
+
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-start space-x-3">
+                          <Checkbox
+                            id="consent"
+                            checked={hasConsented}
+                            onCheckedChange={(checked) => setHasConsented(checked as boolean)}
+                            className="mt-1"
+                          />
+                          <div className="space-y-1">
+                            <Label htmlFor="consent" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
+                              I agree to the collection and processing of my personal data as described in the{" "}
+                              <button
+                                type="button"
+                                className="text-emerald-600 hover:text-emerald-800 underline font-medium"
+                                onClick={() => window.open("/privacy-policy", "_blank")}
+                              >
+                                Privacy Policy
+                              </button>{" "}
+                              and{" "}
+                              <button
+                                type="button"
+                                className="text-emerald-600 hover:text-emerald-800 underline font-medium"
+                                onClick={() => window.open("/terms-of-service", "_blank")}
+                              >
+                                Terms of Service
+                              </button>
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
                     </>
                   )}
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                    <h4 className="text-sm font-semibold text-blue-800 mb-2">Data Collection Notice</h4>
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      We collect your phone number and profile information to provide access to the Hygiene Quest
+                      platform. Your data is used to track hygiene education progress in schools and is protected
+                      according to our privacy policy.
+                      {isLogin ? " By logging in, you acknowledge our data practices." : ""}
+                    </p>
+                  </div>
                 </>
               ) : (
                 <>
