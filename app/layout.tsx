@@ -7,9 +7,9 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "Hygiene Quest Dashboard",
+  description: "Dettol Hygiene Quest Program - Student Attendance and Health Analytics Dashboard",
+  generator: "Next.js",
 }
 
 export default function RootLayout({
