@@ -193,7 +193,7 @@ export function LoginForm() {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-full blur-2xl animate-pulse"></div>
             <Image
-              src="/dettol-hygiene-quest-logo-with-soap-and-water-drop.jpg"
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/hygiene%20quest.jpg-XAATnFIu9nNxBqv6W3KrOc7rRdeBWL.jpeg"
               alt="Hygiene Quest Logo"
               width={120}
               height={120}
@@ -207,7 +207,7 @@ export function LoginForm() {
         </div>
 
         <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent animate-pulse">
-          Dettol Hygiene Quest Uganda
+          Hygiene Quest
         </h1>
         <h2 className="text-xl font-semibold bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent">
           Welcome to the Hygiene Quest Dashboard
@@ -222,7 +222,7 @@ export function LoginForm() {
       </div>
 
       <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-md relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 rounded-t-lg"></div>
         <div className="absolute inset-0 border-2 border-transparent bg-gradient-to-r from-emerald-200 via-teal-200 to-cyan-200 rounded-lg"></div>
         <div className="relative bg-white/95 m-0.5 rounded-lg">
           <CardHeader className="space-y-1 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 rounded-t-lg">
@@ -385,7 +385,7 @@ export function LoginForm() {
 
       {/* Footer */}
       <div className="text-center text-xs bg-gradient-to-r from-gray-500 to-gray-700 bg-clip-text text-transparent font-semibold">
-        © Dettol Hygiene Quest Uganda 2025
+        © Hygiene Quest 2025
       </div>
 
       {/* Demo Info - only show during login */}
