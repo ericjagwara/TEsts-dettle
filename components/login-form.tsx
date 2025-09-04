@@ -1,7 +1,5 @@
 "use client"
-
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -12,67 +10,153 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles } from "lucide-react"
 import Image from "next/image"
 
-const users = [
-  { username: "superadmin", password: "admin123", role: "superadmin" },
-  { username: "manager", password: "manager123", role: "manager" },
-  { username: "viewer", password: "viewer123", role: "viewer" },
-]
+interface User {
+  id: number
+  phone: string
+  name: string
+  role: string
+}
+
+interface OTPResponse {
+  message: string
+}
+
+interface LoginResponse {
+  id: number
+  phone: string
+  name: string
+  role: string
+}
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [email, setEmail] = useState("")
-  const [role, setRole] = useState("viewer")
+  const [step, setStep] = useState<"initial" | "otp">("initial") // For OTP flow
+  const [phone, setPhone] = useState("")
+  const [otp, setOtp] = useState("")
+  const [name, setName] = useState("")
+  const [role, setRole] = useState("fieldworker")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hygienequestemdpoints.onrender.com"
+
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
+    setSuccess("")
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const endpoint = isLogin
+        ? `${API_BASE_URL}/dashboard/send-login-otp`
+        : `${API_BASE_URL}/dashboard/send-registration-otp`
 
-    const user = users.find((u) => u.username === username && u.password === password)
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phone }),
+      })
 
-    if (user) {
-      localStorage.setItem("authUser", JSON.stringify(user))
-      router.push("/dashboard")
-    } else {
-      setError("Invalid username or password")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to send OTP")
+      }
+
+      setStep("otp")
+      setSuccess("OTP sent to your phone number")
+    } catch (err: any) {
+      setError(err.message || "Failed to send OTP")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
+    setSuccess("")
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
+    try {
+      if (isLogin) {
+        // Login with OTP
+        const response = await fetch(`${API_BASE_URL}/dashboard/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ phone, otp }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || "Login failed")
+        }
+
+        const userData: LoginResponse = await response.json()
+
+        // Store user data in localStorage
+        localStorage.setItem("authUser", JSON.stringify(userData))
+
+        // Redirect to dashboard
+        router.push("/dashboard")
+      } else {
+        // First verify OTP for registration
+        const verifyResponse = await fetch(`${API_BASE_URL}/dashboard/verify-registration-otp`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ phone, otp }),
+        })
+
+        if (!verifyResponse.ok) {
+          const errorData = await verifyResponse.json()
+          throw new Error(errorData.detail || "OTP verification failed")
+        }
+
+        // Then register the user
+        const registerResponse = await fetch(`${API_BASE_URL}/dashboard/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ phone, name, role }),
+        })
+
+        if (!registerResponse.ok) {
+          const errorData = await registerResponse.json()
+          throw new Error(errorData.detail || "Registration failed")
+        }
+
+        // Registration successful - show success message and redirect to login
+        setSuccess("Registration successful! Please login with your phone number.")
+
+        // Reset form and switch to login mode
+        setTimeout(() => {
+          setIsLogin(true)
+          resetForm()
+        }, 2000)
+      }
+    } catch (err: any) {
+      setError(err.message || "Operation failed")
+    } finally {
       setIsLoading(false)
-      return
     }
+  }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // In a real app, you'd create the user account here
-    alert(`Account created successfully for ${username} with role ${role}! Please login.`)
-    setIsLogin(true)
-    setUsername("")
-    setPassword("")
-    setConfirmPassword("")
-    setEmail("")
-    setRole("viewer")
-
-    setIsLoading(false)
+  const resetForm = () => {
+    setStep("initial")
+    setPhone("")
+    setOtp("")
+    setName("")
+    setRole("fieldworker")
+    setError("")
+    setSuccess("")
   }
 
   return (
@@ -83,7 +167,7 @@ export function LoginForm() {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-teal-400/20 rounded-full blur-2xl animate-pulse"></div>
             <Image
-              src="/images/hygiene-quest-logo.jpg"
+              src="/dettol-hygiene-quest-logo-with-soap-and-water-drop.jpg"
               alt="Hygiene Quest Logo"
               width={120}
               height={120}
@@ -120,118 +204,147 @@ export function LoginForm() {
               {isLogin ? "Sign In" : "Create Account"}
             </CardTitle>
             <CardDescription className="text-center bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent font-medium">
-              {isLogin ? "Enter your credentials to access the dashboard" : "Register for a new account"}
+              {isLogin
+                ? "Enter your phone number to receive an OTP"
+                : step === "initial"
+                  ? "Enter your phone number to register"
+                  : "Complete your registration"}
             </CardDescription>
           </CardHeader>
-          <form onSubmit={isLogin ? handleLogin : handleRegister}>
+
+          <form onSubmit={step === "initial" ? handleSendOTP : handleVerifyOTP}>
             <CardContent className="space-y-4 pt-6">
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-emerald-700 font-semibold">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
-                    required={!isLogin}
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-emerald-700 font-semibold">
-                  Username
-                </Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-emerald-700 font-semibold">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
-                  required
-                />
-              </div>
-              {!isLogin && (
+              {step === "initial" ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-emerald-700 font-semibold">
-                      Confirm Password
+                    <Label htmlFor="phone" className="text-emerald-700 font-semibold">
+                      Phone Number
                     </Label>
                     <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
                       className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
                       required
                     />
                   </div>
+
+                  {!isLogin && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-emerald-700 font-semibold">
+                          Full Name
+                        </Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="Enter your full name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="role" className="text-emerald-700 font-semibold">
+                          Role
+                        </Label>
+                        <select
+                          id="role"
+                          value={role}
+                          onChange={(e) => setRole(e.target.value)}
+                          className="w-full border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80 rounded-md px-3 py-2"
+                          required
+                        >
+                          <option value="fieldworker">Field Worker</option>
+                          <option value="manager">Manager</option>
+                          <option value="superadmin">Super Admin</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
                   <div className="space-y-2">
-                    <Label htmlFor="role" className="text-emerald-700 font-semibold">
-                      Role
+                    <Label htmlFor="otp" className="text-emerald-700 font-semibold">
+                      OTP Verification Code
                     </Label>
-                    <select
-                      id="role"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="w-full border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80 rounded-md px-3 py-2"
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="Enter the OTP sent to your phone"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      className="border-2 border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 transition-all duration-200 bg-white/80"
                       required
-                    >
-                      <option value="viewer">Viewer</option>
-                      <option value="manager">Manager</option>
-                      <option value="superadmin">Super Admin</option>
-                    </select>
+                    />
                   </div>
+                  <p className="text-sm text-gray-600 text-center">We've sent a verification code to {phone}</p>
                 </>
               )}
+
               {error && (
                 <Alert variant="destructive" className="border-red-200 bg-red-50">
                   <AlertDescription className="text-red-700">{error}</AlertDescription>
                 </Alert>
               )}
+
+              {success && (
+                <Alert className="border-green-200 bg-green-50">
+                  <AlertDescription className="text-green-700">{success}</AlertDescription>
+                </Alert>
+              )}
             </CardContent>
+
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 text-white font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
                 disabled={isLoading}
               >
-                {isLoading ? (isLogin ? "Signing in..." : "Creating Account...") : isLogin ? "Login" : "Register"}
+                {isLoading
+                  ? step === "initial"
+                    ? isLogin
+                      ? "Sending OTP..."
+                      : "Sending OTP..."
+                    : isLogin
+                      ? "Logging in..."
+                      : "Registering..."
+                  : step === "initial"
+                    ? isLogin
+                      ? "Send OTP"
+                      : "Send OTP"
+                    : isLogin
+                      ? "Login"
+                      : "Complete Registration"}
               </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin)
-                  setError("")
-                  setUsername("")
-                  setPassword("")
-                  setConfirmPassword("")
-                  setEmail("")
-                }}
-                className="text-sm bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent hover:from-emerald-800 hover:to-teal-800 hover:underline font-semibold transition-all duration-200"
-              >
-                {isLogin ? "Need an account? Register here" : "Already have an account? Login here"}
-              </button>
-              {isLogin && (
+
+              {step === "initial" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(!isLogin)
+                    resetForm()
+                  }}
+                  className="text-sm bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent hover:from-emerald-800 hover:to-teal-800 hover:underline font-semibold transition-all duration-200"
+                >
+                  {isLogin ? "Need an account? Register here" : "Already have an account? Login here"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setStep("initial")}
+                  className="text-sm bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent hover:from-emerald-800 hover:to-teal-800 hover:underline font-semibold transition-all duration-200"
+                >
+                  Change phone number
+                </button>
+              )}
+
+              {isLogin && step === "initial" && (
                 <button
                   type="button"
                   className="text-sm bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent hover:from-emerald-800 hover:to-teal-800 hover:underline font-semibold transition-all duration-200"
@@ -249,24 +362,24 @@ export function LoginForm() {
         © Dettol Hygiene Quest Uganda 2025
       </div>
 
-      {/* Demo Credentials - only show during login */}
-      {isLogin && (
+      {/* Demo Info - only show during login */}
+      {isLogin && step === "initial" && (
         <Card className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-200 shadow-lg relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400"></div>
           <CardContent className="pt-4">
             <p className="text-xs font-bold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent mb-3 flex items-center gap-2">
               <Sparkles className="w-3 h-3 text-blue-600" />
-              Demo Credentials:
+              How to Login:
             </p>
             <div className="space-y-2 text-xs">
               <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100 font-semibold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
-                Superadmin: superadmin / admin123
+                1. Enter your registered phone number
               </div>
               <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100 font-semibold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
-                Manager: manager / manager123
+                2. Click "Send OTP" to receive a verification code
               </div>
               <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100 font-semibold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
-                Viewer: viewer / viewer123
+                3. Enter the OTP sent to your phone to login
               </div>
             </div>
           </CardContent>
