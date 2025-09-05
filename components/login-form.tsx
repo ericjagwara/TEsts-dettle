@@ -1,13 +1,13 @@
 "use client"
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Sparkles } from "lucide-react"
+import { Sparkles, RotateCcw, Clock } from "lucide-react"
 import Image from "next/image"
 
 // Define types for our data
@@ -39,9 +39,29 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isResending, setIsResending] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [canResend, setCanResend] = useState(false)
   const router = useRouter()
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://hygienequestemdpoints.onrender.com"
+
+  // Countdown timer for resend button
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+    } else if (step === "otp") {
+      setCanResend(true)
+    }
+    return () => clearTimeout(timer)
+  }, [countdown, step])
+
+  // Start countdown when OTP is sent
+  const startCountdown = () => {
+    setCountdown(60) // 60 seconds countdown
+    setCanResend(false)
+  }
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,10 +89,44 @@ export function LoginForm() {
 
       setStep("otp")
       setSuccess("OTP sent to your phone number")
+      startCountdown()
     } catch (err: any) {
       setError(err.message || "Failed to send OTP")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleResendOTP = async () => {
+    setIsResending(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      const endpoint = isLogin 
+        ? `${API_BASE_URL}/dashboard/send-login-otp`
+        : `${API_BASE_URL}/dashboard/send-registration-otp`
+      
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phone }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to resend OTP")
+      }
+
+      setSuccess("OTP resent to your phone number")
+      startCountdown()
+      setOtp("") // Clear previous OTP input
+    } catch (err: any) {
+      setError(err.message || "Failed to resend OTP")
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -158,6 +212,8 @@ export function LoginForm() {
     setRole("fieldworker")
     setError("")
     setSuccess("")
+    setCountdown(0)
+    setCanResend(false)
   }
 
   return (
@@ -282,9 +338,48 @@ export function LoginForm() {
                       required 
                     />
                   </div>
-                  <p className="text-sm text-gray-600">
-                    We've sent a verification code to {phone}
-                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-600">
+                      We've sent a verification code to {phone}
+                    </p>
+                    {countdown > 0 && (
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <Clock className="w-4 h-4" />
+                        <span>{countdown}s</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Resend OTP Button */}
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResendOTP}
+                      disabled={!canResend || isResending}
+                      className={`w-full border-2 transition-all duration-200 ${
+                        canResend 
+                          ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400" 
+                          : "border-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <RotateCcw className={`w-4 h-4 mr-2 ${isResending ? "animate-spin" : ""}`} />
+                      {isResending 
+                        ? "Resending OTP..." 
+                        : canResend 
+                          ? "Resend OTP" 
+                          : `Resend OTP (${countdown}s)`}
+                    </Button>
+                  </div>
+
+                  {/* OTP Help Text */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      <strong>Didn't receive the code?</strong> Check your messages or click "Resend OTP" after the timer expires. 
+                      The OTP is valid for 10 minutes and may take up to 2 minutes to arrive.
+                    </p>
+                  </div>
                 </>
               )}
 
@@ -373,6 +468,9 @@ export function LoginForm() {
               </div>
               <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100">
                 3. Enter the OTP sent to your phone to login
+              </div>
+              <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100">
+                4. Use "Resend OTP" if you don't receive the code within 2 minutes
               </div>
             </div>
           </CardContent>
