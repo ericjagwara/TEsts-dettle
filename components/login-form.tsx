@@ -31,7 +31,7 @@ interface LoginResponse {
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
-  const [step, setStep] = useState<"initial" | "otp">("initial") 
+  const [step, setStep] = useState<"initial" | "otp">("initial") // For OTP flow
   const [phone, setPhone] = useState("")
   const [otp, setOtp] = useState("")
   const [name, setName] = useState("")
@@ -97,39 +97,6 @@ export function LoginForm() {
       }
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleResendOTP = async () => {
-    setIsResending(true)
-    setError("")
-    setSuccess("")
-
-    try {
-      const endpoint = isLogin 
-        ? `${API_BASE_URL}/dashboard/send-login-otp`
-        : `${API_BASE_URL}/dashboard/send-registration-otp`
-      
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to resend OTP")
-      }
-
-      setSuccess("OTP resent to your phone number")
-      startCountdown()
-      setOtp("") 
-    } catch (err: any) {
-      setError(err.message || "Failed to resend OTP")
-    } finally {
-      setIsResending(false)
     }
   }
 
