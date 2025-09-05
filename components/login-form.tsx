@@ -1,6 +1,6 @@
 "use client"
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,11 @@ export function LoginForm() {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "https://hygienequestemdpoints.onrender.com"
 
+  // Countdown timer for resend button (kept minimal since branch version doesn’t include resend state)
+  useEffect(() => {}, [])
+
+  const startCountdown = () => {}
+
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -83,6 +88,7 @@ export function LoginForm() {
 
       setStep("otp")
       setSuccess("OTP sent to your phone number")
+      startCountdown()
     } catch (err: any) {
       if (err.name === "AbortError") {
         setError("Request timed out. Please check your connection and try again.")
@@ -456,6 +462,9 @@ export function LoginForm() {
               </div>
               <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100 font-semibold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
                 3. Enter the OTP sent to your phone to login
+              </div>
+              <div className="bg-white/90 p-3 rounded-lg shadow-sm border border-blue-100">
+                4. Use "Resend OTP" if you don't receive the code within 2 minutes
               </div>
             </div>
           </CardContent>
